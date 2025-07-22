@@ -46,6 +46,8 @@ function parse_cuda_flag() {
 # Determine the image tag based on the flags
 function get_base_tag() {
     local gpu_flag
+    local cuda_flag
+    local cpu_flag
     gpu_flag=$(parse_gpu_flag "$@")
     cuda_flag=$(parse_cuda_flag "$@")
     cpu_flag=$(parse_cpu_flag "$@")
@@ -61,7 +63,7 @@ function get_base_tag() {
     fi
 }
 
-function get_vsss_sim_service() {
+function get_compose_service_from_base() {
     local gpu_flag
     gpu_flag=$(parse_gpu_flag "$@")
     if [[ "$gpu_flag" == "true" ]]; then
@@ -98,10 +100,6 @@ function build_base_image() {
     local base_tag
     base_tag=$(get_base_image_service "$@")
     echo "🚧 Building base image: $base_tag"
-    echo "Debug"
-    # export BUILT_CPU_BASE_IMAGE="${DOCKER_REGISTRY}/${PROJECT_NAME}_cpu_base"
-    # export BUILT_CUDA_BASE_IMAGE="${DOCKER_REGISTRY}/${PROJECT_NAME}_cuda_base"
-    echo "Debug"
     echo "COMPOSE_FILE_PATH=$COMPOSE_FILE_PATH"
     echo "ENV_FILE_PATH=$ENV_FILE_PATH"
     echo "BUILD_CONTEXT=$BUILD_CONTEXT"
@@ -111,12 +109,17 @@ function build_base_image() {
     docker compose --env-file "$ENV_FILE_PATH" -f "$COMPOSE_FILE_PATH" build $base_tag
 }
 
-function build_vsss_sim_image() {
+function build_development_image() {
     local base_tag
     base_tag=$(get_base_tag "$@")
     local service
-    service=$(get_vsss_sim_service "$@")
-
+    service=$(get_compose_service_from_base "$@")
+    echo $base_tag
+    echo "🚧 Building development image: $service (based on $base_tag)"
+    if [[ -z "$base_tag" ]]; then
+        echo "❌ Error: No valid base image tag found. Please specify --gpu, --cuda, or --cpu."
+        exit 1
+    fi
     echo "🔧 Building vsss_sim image: $service (based on $base_tag)"
     export vsss_sim_BASE_IMAGE="$DOCKER_REGISTRY/$PROJECT_NAME:$base_tag"
     export vsss_sim_BASE_IMAGE_TAG="$base_tag"
@@ -128,13 +131,13 @@ function run_container() {
     base_tag=$(get_base_tag "$@")
     local base_image="$DOCKER_REGISTRY/$PROJECT_NAME:$base_tag"
     local service
-    service=$(get_vsss_sim_service "$@")
+    service=$(get_compose_service_from_base "$@")
 
     echo "🚀 Starting container: $service"
     xhost +local:docker
     vsss_sim_BASE_IMAGE="$base_image" \
     vsss_sim_BASE_IMAGE_TAG="$base_tag" \
-    docker compose -f "$COMPOSE_FILE_PATH" up "$service"
+    docker compose -f "$COMPOSE_FILE_PATH" up -d "$service"
     until docker exec -it "$service" bash -c "ls /tmp/build_done" &>/dev/null; do
         echo "⏳ Waiting for build to complete..."
         sleep 2
@@ -144,7 +147,7 @@ function run_container() {
 
 function attach_shell() {
     local service
-    service=$(get_vsss_sim_service "$@")
+    service=$(get_compose_service_from_base "$@")
 
     echo "🧑‍💻 Attaching to $service shell..."
     docker exec -it "$service" bash
@@ -158,8 +161,19 @@ function deploy() {
         exit 1
     fi
 
+    if [[ "$(parse_gpu_flag "$@")" == "true" ]]; then
+        echo "🚀 Deploying with GPU support..."
+    elif [[ "$(parse_cuda_flag "$@")" == "true" ]]; then
+        echo "🚀 Deploying with CUDA support..."
+    elif [[ "$(parse_cpu_flag "$@")" == "true" ]]; then
+        echo "🚀 Deploying with CPU support..."
+    else
+        echo "❌ Error: No valid target specified. Please use --gpu, --cuda, or --cpu."
+        exit 1
+    fi
+
     build_base_image "$@"
-    build_vsss_sim_image "$@"
+    build_development_image "$@"
     run_container "$@"
     attach_shell "$@"
 }
@@ -188,7 +202,7 @@ function stop_container() {
 
     # Otherwise stop the specific one
     local service
-    service=$(get_vsss_sim_service "$@")
+    service=$(get_compose_service_from_base "$@")
 
     echo "🛑 Stopping container: $service"
     docker compose -f "$COMPOSE_FILE_PATH"  stop "$service"
@@ -212,7 +226,7 @@ function remove_container() {
 
     # Otherwise remove the specific service
     local service
-    service=$(get_vsss_sim_service "$@")
+    service=$(get_compose_service_from_base "$@")
 
     echo "🛑 Removing container: $service"
     docker compose -f "$COMPOSE_FILE_PATH" down "$service"
@@ -230,7 +244,7 @@ function help_message() {
     echo
     echo "Commands:"
     echo "  -build-base [--gpu]      Build only the base image"
-    echo "  -build-vsss_sim [--gpu]      Build only the VSSS image"
+    echo "  -build-development-image [--gpu]      Build only the VSSS image"
     echo "  -run [--gpu]             Start only the container"
     echo "  -dev-mode [--gpu]        Run + attach to shell"
     echo "  -deploy [--gpu|--cuda]       Build everything, run, and attach"
@@ -248,8 +262,8 @@ case "$1" in
     -build-base)
         build_base_image "$@"
         ;;
-    -build-vsss_sim)
-        build_vsss_sim_image "$@"
+    -build-development-image)
+        build_development_image "$@"
         ;;
     -run)
         run_container "$@"
