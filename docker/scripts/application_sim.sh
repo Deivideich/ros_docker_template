@@ -192,11 +192,11 @@ function remove_container() {
 # }
 
 function help_message() {
-    echo "Usage: ./vsss_sim.sh [COMMAND] [--gpu]"
+    echo "Usage: ./application_sim.sh [COMMAND] [--gpu]"
     echo
     echo "Commands:"
     echo "  -build-base [--gpu]      Build only the base image"
-    echo "  -build-development-image [--gpu]      Build only the VSSS image"
+    echo "  -build-development-image [--gpu]      Build only the APPLICATION image"
     echo "  -run [--gpu]             Start only the container"
     echo "  -dev-mode [--gpu]        Run + attach to shell"
     echo "  -deploy [--gpu|--cuda]       Build everything, run, and attach"
@@ -204,9 +204,9 @@ function help_message() {
     echo "  -help                    Show this help message"
     echo
     echo "Examples:"
-    echo "  ./vsss_sim.sh -deploy"
-    echo "  ./vsss_sim.sh -dev-mode --gpu"
-    echo "  ./vsss_sim.sh -build-base"
+    echo "  ./application_sim.sh -deploy"
+    echo "  ./application_sim.sh -dev-mode --gpu"
+    echo "  ./application_sim.sh -build-base"
 }
 
 # Main dispatcher

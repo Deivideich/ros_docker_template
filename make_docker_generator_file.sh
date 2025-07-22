@@ -109,8 +109,14 @@ FUNC_EOF
     # Replace template variables with actual values
     sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
-    sed -i "s/APPLICATION_SIM_DOCKERFILE/APPLICATION_\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
-    sed -i "s/APPLICATION_TEST_PROJECT_DOCKERFILE/APPLICATION_\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/APPLICATION_SIM_DOCKERFILE/\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/APPLICATION_TEST_PROJECT_DOCKERFILE/\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace service names that contain the project name
+    sed -i "s/application_cuda/\${PROJECT_NAME}_cuda/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/application_gpu/\${PROJECT_NAME}_gpu/g" "\${PROJECT_NAME}/docker/$output_path"  
+    sed -i "s/application_cpu/\${PROJECT_NAME}_cpu/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace workspace paths
+    sed -i "s/application_ws/\${PROJECT_NAME}_ws/g" "\${PROJECT_NAME}/docker/$output_path"
 VAR_EOF
             ;;
         *.env)
@@ -120,6 +126,9 @@ VAR_EOF
     sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/roborregos/\$DOCKER_REGISTRY/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace dockerfile environment variables
+    sed -i "s/APPLICATION_SIM_DOCKERFILE/\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/APPLICATION_DOCKERFILE/APPLICATION_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
 VAR_EOF
             ;;
         scripts/*.sh)
@@ -130,6 +139,16 @@ VAR_EOF
     sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/APPLICATION_SIM/\${PROJECT_NAME^^}/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/TEST_PROJECT/\${PROJECT_NAME^^}/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace function names and variables that contain the project name
+    sed -i "s/get_application_sim_service/get_\${PROJECT_NAME}_service/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/build_application_sim_image/build_\${PROJECT_NAME}_image/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/application_sim_BASE_IMAGE/\${PROJECT_NAME}_BASE_IMAGE/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/application_sim_BASE_IMAGE_TAG/\${PROJECT_NAME}_BASE_IMAGE_TAG/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace help text and comments
+    sed -i "s/vsss_sim\\.sh/\${PROJECT_NAME}.sh/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/VSSS/\${PROJECT_NAME^^}/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace workspace paths for all script files
+    sed -i "s/application_ws/\${PROJECT_NAME}_ws/g" "\${PROJECT_NAME}/docker/$output_path"
 VAR_EOF
             ;;
         dockerfiles/*.dockerfile)
@@ -140,6 +159,8 @@ VAR_EOF
     # Replace template variables with actual values  
     sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    # Replace workspace paths in dockerfiles
+    sed -i "s/application_ws/\${PROJECT_NAME}_ws/g" "\${PROJECT_NAME}/docker/$output_path"
 VAR_EOF
             fi
             ;;

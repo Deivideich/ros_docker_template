@@ -38,8 +38,6 @@ WORKDIR /ros/application_ws
 RUN rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
 
-
-
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
 
