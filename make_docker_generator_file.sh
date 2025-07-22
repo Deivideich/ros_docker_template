@@ -2,6 +2,7 @@
 
 # make_docker_generator_file.sh
 # This script creates a portable docker_template_generator.sh that can recreate the entire /docker/ structure
+# Uses template analysis to generate a robust and flexible generator
 
 set -e
 
@@ -9,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKER_DIR="$SCRIPT_DIR/docker"
 OUTPUT_FILE="$SCRIPT_DIR/docker_template_generator.sh"
 
-echo "🔧 Creating Docker template generator..."
+echo "🔧 Creating Docker template generator from existing docker/ folder..."
 
 # Check if docker directory exists
 if [[ ! -d "$DOCKER_DIR" ]]; then
@@ -17,8 +18,21 @@ if [[ ! -d "$DOCKER_DIR" ]]; then
     exit 1
 fi
 
-# Start creating the generator script
-cat > "$OUTPUT_FILE" << 'EOF'
+# Analyze existing docker structure to extract template patterns
+analyze_template_patterns() {
+    echo "🔍 Analyzing template patterns in docker/ folder..."
+    
+    # Find all unique project names and registry names used
+    local project_patterns=($(find "$DOCKER_DIR" -type f -exec grep -l "application_sim\|test_project" {} \; 2>/dev/null | head -5))
+    local registry_patterns=($(find "$DOCKER_DIR" -type f -exec grep -l "roborregos" {} \; 2>/dev/null | head -5))
+    
+    echo "  📋 Found files with project patterns: ${#project_patterns[@]}"
+    echo "  📋 Found files with registry patterns: ${#registry_patterns[@]}"
+}
+
+# Generate the template file with smart content embedding
+generate_template_generator() {
+    cat > "$OUTPUT_FILE" << 'GENERATOR_EOF'
 #!/bin/bash
 
 # Docker Template Generator
@@ -37,65 +51,141 @@ echo "📦 Using Docker registry: $DOCKER_REGISTRY"
 # Create directory structure
 create_directory_structure() {
     echo "📁 Creating directory structure..."
-    mkdir -p docker/{compose,dockerfiles,env_files,scripts}
+    mkdir -p "${PROJECT_NAME}/docker/compose"
+    mkdir -p "${PROJECT_NAME}/docker/dockerfiles"
+    mkdir -p "${PROJECT_NAME}/docker/env_files"
+    mkdir -p "${PROJECT_NAME}/docker/scripts"
     echo "✅ Directory structure created"
 }
 
-# Function to create files with content
-create_file_with_content() {
-    local file_path="$1"
-    local content="$2"
-    
-    echo "📝 Creating $file_path..."
-    mkdir -p "$(dirname "$file_path")"
-    echo "$content" > "$file_path"
-}
-
 # Start file creation functions
-EOF
+
+GENERATOR_EOF
+}
 
 # Function to escape content for heredoc
-escape_content() {
+escape_for_heredoc() {
     local file="$1"
-    # Read file and escape special characters for heredoc
-    sed 's/\\/\\\\/g; s/`/\\`/g; s/\$/\\$/g' "$file"
+    # Read file content and escape it properly for heredoc
+    # Use a unique EOF marker to avoid conflicts
+    local eof_marker="FILE_CONTENT_EOF_$(date +%s)"
+    sed "s/EOF/${eof_marker}_ESCAPED_EOF/g" "$file"
 }
 
-# Function to add file creation to generator
-add_file_to_generator() {
-    local relative_path="$1"
-    local full_path="$2"
+# Generate function for each file type
+generate_file_function() {
+    local file_path="$1"
+    local relative_path="${file_path#$DOCKER_DIR/}"
     local function_name="create_$(echo "$relative_path" | sed 's/[^a-zA-Z0-9]/_/g')"
+    local unique_eof="EOF_$(echo "$relative_path" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:lower:]' '[:upper:]')"
     
-    echo "" >> "$OUTPUT_FILE"
-    echo "# Create $relative_path" >> "$OUTPUT_FILE"
-    echo "$function_name() {" >> "$OUTPUT_FILE"
-    echo "    local content=\$'$(escape_content "$full_path")'" >> "$OUTPUT_FILE"
-    echo "    # Replace template variables with actual values" >> "$OUTPUT_FILE"
-    echo "    content=\${content//application_sim/\$PROJECT_NAME}" >> "$OUTPUT_FILE"
-    echo "    content=\${content//roborregos/\$DOCKER_REGISTRY}" >> "$OUTPUT_FILE"
-    echo "    create_file_with_content \"docker/$relative_path\" \"\$content\"" >> "$OUTPUT_FILE"
-    echo "}" >> "$OUTPUT_FILE"
+    # Handle dynamic file naming for script files and dockerfiles
+    local output_path="$relative_path"
+    if [[ "$relative_path" =~ scripts/.*\.sh$ ]]; then
+        # Replace any known project names in filename with ${PROJECT_NAME}
+        output_path=$(echo "$relative_path" | sed 's/test_project/${PROJECT_NAME}/g; s/application_sim/${PROJECT_NAME}/g')
+    elif [[ "$relative_path" =~ dockerfiles/.*\.dockerfile$ ]]; then
+        # Replace project names in dockerfile names
+        output_path=$(echo "$relative_path" | sed 's/test_project/${PROJECT_NAME}/g; s/application_sim/${PROJECT_NAME}/g')
+    fi
     
-    # Add function call to main execution
-    echo "$function_name" >> "/tmp/generator_calls.txt"
+    echo "  📝 Generating function for: $relative_path -> $output_path"
+    
+    # Add function to generator
+    cat >> "$OUTPUT_FILE" << FUNC_EOF
+
+# Create $relative_path
+$function_name() {
+    cat > "\${PROJECT_NAME}/docker/$output_path" << '$unique_eof'
+$(cat "$file_path")
+$unique_eof
+FUNC_EOF
+
+    # Add variable replacement logic based on file type
+    case "$relative_path" in
+        *.yml|*.yaml)
+            cat >> "$OUTPUT_FILE" << VAR_EOF
+    
+    # Replace template variables with actual values
+    sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/APPLICATION_SIM_DOCKERFILE/APPLICATION_\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/APPLICATION_TEST_PROJECT_DOCKERFILE/APPLICATION_\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
+VAR_EOF
+            ;;
+        *.env)
+            cat >> "$OUTPUT_FILE" << VAR_EOF
+    
+    # Replace template variables with actual values
+    sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/roborregos/\$DOCKER_REGISTRY/g" "\${PROJECT_NAME}/docker/$output_path"
+VAR_EOF
+            ;;
+        scripts/*.sh)
+            cat >> "$OUTPUT_FILE" << VAR_EOF
+    
+    # Replace template variables with actual values
+    sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/APPLICATION_SIM/\${PROJECT_NAME^^}/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/TEST_PROJECT/\${PROJECT_NAME^^}/g" "\${PROJECT_NAME}/docker/$output_path"
+VAR_EOF
+            ;;
+        dockerfiles/*.dockerfile)
+            # Handle dockerfile naming
+            if [[ "$relative_path" =~ (test_project|application_sim)\.dockerfile$ ]]; then
+                cat >> "$OUTPUT_FILE" << VAR_EOF
+    
+    # Replace template variables with actual values  
+    sed -i "s/application_sim/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+    sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
+VAR_EOF
+            fi
+            ;;
+    esac
+    
+    cat >> "$OUTPUT_FILE" << 'FUNC_EOF'
+}
+FUNC_EOF
+    
+    # Store function name for main execution
+    echo "$function_name" >> "/tmp/generator_functions.txt"
 }
 
-# Initialize calls file
-echo "" > "/tmp/generator_calls.txt"
+# Process all files and generate the template
+process_docker_files() {
+    echo "📋 Processing files in docker/ directory..."
+    
+    # Initialize function list
+    echo "" > "/tmp/generator_functions.txt"
+    
+    # Process files in a specific order for better organization
+    local file_order=(
+        "scripts"
+        "compose" 
+        "dockerfiles"
+        "env_files"
+    )
+    
+    for dir in "${file_order[@]}"; do
+        if [[ -d "$DOCKER_DIR/$dir" ]]; then
+            echo "  📂 Processing directory: $dir/"
+            find "$DOCKER_DIR/$dir" -type f | sort | while read -r file; do
+                generate_file_function "$file"
+            done
+        fi
+    done
+    
+    # Process any remaining files not in the standard directories
+    find "$DOCKER_DIR" -maxdepth 1 -type f | sort | while read -r file; do
+        generate_file_function "$file"
+    done
+}
 
-# Process all files in docker directory
-echo "📋 Processing files in /docker/ directory..."
-
-find "$DOCKER_DIR" -type f | while read -r file; do
-    # Get relative path from docker directory
-    relative_path="${file#$DOCKER_DIR/}"
-    echo "  Processing: $relative_path"
-    add_file_to_generator "$relative_path" "$file"
-done
-
-# Add main execution function to generator
-cat >> "$OUTPUT_FILE" << 'EOF'
+# Add main execution function
+add_main_function() {
+    cat >> "$OUTPUT_FILE" << 'MAIN_EOF'
 
 # Main execution function
 main() {
@@ -105,30 +195,31 @@ main() {
     create_directory_structure
     
     # Create all files
-EOF
+MAIN_EOF
 
-# Add all function calls
-while read -r call; do
-    if [[ -n "$call" ]]; then
-        echo "    $call" >> "$OUTPUT_FILE"
-    fi
-done < "/tmp/generator_calls.txt"
+    # Add all function calls
+    while IFS= read -r func; do
+        if [[ -n "$func" ]]; then
+            echo "    $func" >> "$OUTPUT_FILE"
+        fi
+    done < "/tmp/generator_functions.txt"
 
-cat >> "$OUTPUT_FILE" << 'EOF'
+    cat >> "$OUTPUT_FILE" << 'MAIN_EOF'
     
     # Make scripts executable
-    chmod +x docker/scripts/*.sh
+    chmod +x "${PROJECT_NAME}/docker/scripts/"*.sh
     
     echo "✅ Docker template generated successfully!"
     echo ""
     echo "📋 Next steps:"
-    echo "1. Navigate to the docker/compose directory: cd docker/compose"
-    echo "2. Review and customize the .env file if needed"
-    echo "3. Build and run your application:"
-    echo "   ./docker/scripts/application_sim.sh -deploy --gpu"
+    echo "1. Navigate to the project directory: cd ${PROJECT_NAME}"
+    echo "2. Navigate to the docker/compose directory: cd docker/compose"
+    echo "3. Review and customize the .env file if needed"
+    echo "4. Build and run your application:"
+    echo "   ./docker/scripts/${PROJECT_NAME}.sh -deploy --gpu"
     echo ""
     echo "🔧 Available commands:"
-    echo "   ./docker/scripts/application_sim.sh -help"
+    echo "   ./docker/scripts/${PROJECT_NAME}.sh -help"
 }
 
 # Script usage
@@ -155,21 +246,49 @@ case "$1" in
         main
         ;;
 esac
-EOF
+MAIN_EOF
+}
 
-# Make the generator executable
-chmod +x "$OUTPUT_FILE"
+# Main execution
+main() {
+    analyze_template_patterns
+    generate_template_generator
+    process_docker_files
+    add_main_function
+    
+    # Make the generator executable
+    chmod +x "$OUTPUT_FILE"
+    
+    # Clean up temporary files
+    rm -f "/tmp/generator_functions.txt"
+    
+    echo "✅ Docker template generator created successfully!"
+    echo "📄 Generator saved as: $OUTPUT_FILE"
+    echo ""
+    echo "🎯 To use the generator:"
+    echo "1. Copy docker_template_generator.sh to any new project directory"
+    echo "2. Run: ./docker_template_generator.sh [project_name] [docker_registry]"
+    echo "3. The entire Docker structure will be recreated"
+    echo ""
+    echo "📋 Example usage:"
+    echo "  ./docker_template_generator.sh my_new_project my_registry"
+    echo ""
+    echo "🔧 Testing the generated template..."
+    
+    # Quick validation test
+    if [[ -x "$OUTPUT_FILE" ]]; then
+        echo "✅ Generator script is executable"
+        
+        # Test syntax
+        if bash -n "$OUTPUT_FILE" 2>/dev/null; then
+            echo "✅ Generator script syntax is valid"
+        else
+            echo "⚠️  Warning: Generator script has syntax issues"
+        fi
+    else
+        echo "❌ Error: Generator script is not executable"
+    fi
+}
 
-# Clean up temporary file
-rm -f "/tmp/generator_calls.txt"
-
-echo "✅ Docker template generator created successfully!"
-echo "📄 Generator saved as: $OUTPUT_FILE"
-echo ""
-echo "🎯 To use the generator:"
-echo "1. Copy docker_template_generator.sh to any new project directory"
-echo "2. Run: ./docker_template_generator.sh [project_name] [docker_registry]"
-echo "3. The entire Docker structure will be recreated"
-echo ""
-echo "📋 Example usage:"
-echo "  ./docker_template_generator.sh my_new_project my_registry"
+# Run the script
+main
