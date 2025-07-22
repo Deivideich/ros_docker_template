@@ -6,15 +6,15 @@ source /opt/ros/humble/setup.bash
 
 #rosdep
 rosdep update
-rosdep install --from-paths /ros/vsss_ws/src --ignore-src -r -y
+rosdep install --from-paths /ros/application_ws/src --ignore-src -r -y
 
 # Optional: source overlay if needed
-if [ -f "/ros/vsss_ws/install/setup.bash" ]; then
-  source /ros/vsss_ws/install/setup.bash
+if [ -f "/ros/application_ws/install/setup.bash" ]; then
+  source /ros/application_ws/install/setup.bash
 fi
 
 # Build
-cd /ros/vsss_ws
+cd /ros/application_ws
 colcon build --symlink-install
 touch /tmp/build_done
 

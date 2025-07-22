@@ -15,10 +15,10 @@ services:
         BASE_IMAGE: ${CUDA_BASE_IMAGE}
     image: ${DOCKER_REGISTRY}/${PROJECT_NAME}:cuda_base
 
-  vsss_sim_cuda:
+  application_sim_cuda:
     build:
       context: ${BUILD_CONTEXT}
-      dockerfile: ${VSSS_SIM_DOCKERFILE}
+      dockerfile: ${APPLICATION_SIM_DOCKERFILE}
       args:
         BASE_IMAGE: ${BUILT_CUDA_BASE_IMAGE}
     image: ${DOCKER_REGISTRY}/${PROJECT_NAME}_cuda
@@ -31,7 +31,7 @@ services:
       - LIBGL_ALWAYS_INDIRECT=${LIBGL_ALWAYS_INDIRECT}
     volumes:
       - ${X11_SOCKET_PATH}:${X11_SOCKET_PATH}
-      - ${WORKSPACE_PATH}:/ros/vsss_ws/src/
+      - ${WORKSPACE_PATH}:/ros/application_ws/src/
     devices:
       - /dev/dri:/dev/dri
     network_mode: ${NETWORK_MODE}
@@ -47,10 +47,10 @@ services:
               count: ${GPU_COUNT}
               capabilities: [gpu]
 
-  vsss_sim_gpu:
+  application_sim_gpu:
     build:
       context: ${BUILD_CONTEXT}
-      dockerfile: ${VSSS_SIM_DOCKERFILE}
+      dockerfile: ${APPLICATION_SIM_DOCKERFILE}
       args:
         BASE_IMAGE: ${DOCKER_REGISTRY}/${PROJECT_NAME}:cpu_base
     image: ${DOCKER_REGISTRY}/${PROJECT_NAME}_gpu
@@ -63,7 +63,7 @@ services:
       - LIBGL_ALWAYS_INDIRECT=${LIBGL_ALWAYS_INDIRECT}
     volumes:
       - ${X11_SOCKET_PATH}:${X11_SOCKET_PATH}
-      - ${WORKSPACE_PATH}:/ros/vsss_ws/src/
+      - ${WORKSPACE_PATH}:/ros/application_ws/src/
     devices:
       - /dev/dri:/dev/dri
     network_mode: ${NETWORK_MODE}
@@ -72,10 +72,10 @@ services:
     tty: ${TTY}
     command: []
 
-  vsss_sim_cpu:
+  application_sim_cpu:
     build:
       context: ${BUILD_CONTEXT}
-      dockerfile: ${VSSS_SIM_DOCKERFILE}
+      dockerfile: ${APPLICATION_SIM_DOCKERFILE}
       args:
         BASE_IMAGE: ${BUILT_CPU_BASE_IMAGE}
     image: ${DOCKER_REGISTRY}/${PROJECT_NAME}_cpu
@@ -86,7 +86,7 @@ services:
       - QT_X11_NO_MITSHM=1
     volumes:
       - ${X11_SOCKET_PATH}:${X11_SOCKET_PATH}
-      - ${WORKSPACE_PATH}:/ros/vsss_ws/src/
+      - ${WORKSPACE_PATH}:/ros/application_ws/src/
     stdin_open: ${STDIN_OPEN}
     tty: ${TTY}
     privileged: ${PRIVILEGED}

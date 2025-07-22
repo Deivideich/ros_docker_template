@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     terminator nano net-tools iputils-ping
 
 # Setup ROS workspace directory and permissions
-RUN mkdir -p /ros/vsss_ws/src && \
+RUN mkdir -p /ros/application_ws/src && \
     chown -R ros:ros /ros
 
 # Clean any existing rosdep data and initialize rosdep (run as root)
@@ -32,7 +32,7 @@ RUN chmod +x /entrypoint.sh
 
 # Switch to non-root user
 USER ros
-WORKDIR /ros/vsss_ws
+WORKDIR /ros/application_ws
 
 # Update rosdep db and install dependencies (run as ros user)
 RUN rosdep update && \
