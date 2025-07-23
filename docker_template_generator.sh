@@ -155,10 +155,10 @@ function run_container() {
     application_sim_BASE_IMAGE="$base_image" \
     application_sim_BASE_IMAGE_TAG="$base_tag" \
     docker compose -f "$COMPOSE_FILE_PATH" up -d "$service"
-    until docker exec -it "$container_name" bash -c "ls /tmp/build_done" &>/dev/null; do
-        echo "⏳ Waiting for build to complete..."
-        sleep 2
-    done
+    # until docker exec -it "$container_name" bash -c "ls /tmp/build_done" &>/dev/null; do
+    #     echo "⏳ Waiting for build to complete..."
+    #     sleep 2
+    # done
     echo "✅ Done"
 }
 
@@ -578,7 +578,7 @@ WORKDIR /ros/application_ws
 RUN rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
 
-ENTRYPOINT ["/entrypoint.sh"]
+# ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
 
 # Source ROS 2 setup on login
