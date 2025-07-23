@@ -111,10 +111,6 @@ FUNC_EOF
     sed -i "s/test_project/\$PROJECT_NAME/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/APPLICATION_SIM_DOCKERFILE/\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
     sed -i "s/APPLICATION_TEST_PROJECT_DOCKERFILE/\${PROJECT_NAME^^}_DOCKERFILE/g" "\${PROJECT_NAME}/docker/$output_path"
-    # Replace service names that contain the project name
-    sed -i "s/application_cuda/\${PROJECT_NAME}_cuda/g" "\${PROJECT_NAME}/docker/$output_path"
-    sed -i "s/application_gpu/\${PROJECT_NAME}_gpu/g" "\${PROJECT_NAME}/docker/$output_path"  
-    sed -i "s/application_cpu/\${PROJECT_NAME}_cpu/g" "\${PROJECT_NAME}/docker/$output_path"
     # Replace workspace paths
     sed -i "s/application_ws/\${PROJECT_NAME}_ws/g" "\${PROJECT_NAME}/docker/$output_path"
 VAR_EOF

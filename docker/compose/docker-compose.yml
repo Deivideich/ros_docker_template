@@ -15,7 +15,7 @@ services:
         BASE_IMAGE: ${CUDA_BASE_IMAGE}
     image: ${DOCKER_REGISTRY}/${PROJECT_NAME}:cuda_base
 
-  application_sim_cuda:
+  application_cuda:
     build:
       context: ${BUILD_CONTEXT}
       dockerfile: ${APPLICATION_SIM_DOCKERFILE}
@@ -47,7 +47,7 @@ services:
               count: ${GPU_COUNT}
               capabilities: [gpu]
 
-  application_sim_gpu:
+  application_gpu:
     build:
       context: ${BUILD_CONTEXT}
       dockerfile: ${APPLICATION_SIM_DOCKERFILE}
@@ -72,7 +72,7 @@ services:
     tty: ${TTY}
     command: []
 
-  application_sim_cpu:
+  application_cpu:
     build:
       context: ${BUILD_CONTEXT}
       dockerfile: ${APPLICATION_SIM_DOCKERFILE}

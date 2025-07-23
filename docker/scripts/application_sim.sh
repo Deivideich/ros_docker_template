@@ -22,6 +22,26 @@ function parse_gpu_flag() {
     echo "$use_gpu"
 }
 
+function parse_cuda_flag() {
+    local use_cuda=false
+    for arg in "$@"; do
+        if [[ "$arg" == "--cuda" ]]; then
+            use_cuda=true
+        fi
+    done
+    echo "$use_cuda"
+}
+
+function parse_cpu_flag() {
+    local use_cpu=false
+    for arg in "$@"; do
+        if [[ "$arg" == "--cpu" ]]; then
+            use_cpu=true
+        fi
+    done
+    echo "$use_cpu"
+}
+
 # Utility to determine CUDA support
 function has_cuda_support() {
     local use_CUDA=false
@@ -50,11 +70,23 @@ function get_application_sim_service() {
     local gpu_flag
     gpu_flag=$(parse_gpu_flag "$@")
     if [[ "$gpu_flag" == "true" ]]; then
-        echo "${PROJECT_NAME}_gpu"
+        echo "application_gpu"
     elif [[ "$(has_cuda_support "$@")" == "true" ]]; then
-        echo "${PROJECT_NAME}_cuda"
+        echo "application_cuda"
     else
-        echo "${PROJECT_NAME}_cpu"
+        echo "application_cpu"
+    fi
+}
+
+function get_application_sim_container_name() {
+    local gpu_flag
+    gpu_flag=$(parse_gpu_flag "$@")
+    if [[ "$gpu_flag" == "true" ]]; then
+        echo "application_sim_gpu"
+    elif [[ "$(has_cuda_support "$@")" == "true" ]]; then
+        echo "application_sim_cuda"
+    else
+        echo "application_sim_cpu"
     fi
 }
 
@@ -84,13 +116,15 @@ function run_container() {
     local base_image="$DOCKER_REGISTRY/$PROJECT_NAME:$base_tag"
     local service
     service=$(get_application_sim_service "$@")
+    local container_name
+    container_name=$(get_application_sim_container_name "$@")
 
     echo "🚀 Starting container: $service"
     xhost +local:docker
     application_sim_BASE_IMAGE="$base_image" \
     application_sim_BASE_IMAGE_TAG="$base_tag" \
     docker compose -f "$COMPOSE_FILE_PATH" up -d "$service"
-    until docker exec -it "$service" bash -c "ls /tmp/build_done" &>/dev/null; do
+    until docker exec -it "$container_name" bash -c "ls /tmp/build_done" &>/dev/null; do
         echo "⏳ Waiting for build to complete..."
         sleep 2
     done
@@ -98,11 +132,11 @@ function run_container() {
 }
 
 function attach_shell() {
-    local service
-    service=$(get_application_sim_service "$@")
+    local container_name
+    container_name=$(get_application_sim_container_name "$@")
 
-    echo "🧑‍💻 Attaching to $service shell..."
-    docker exec -it "$service" bash
+    echo "🧑‍💻 Attaching to $container_name shell..."
+    docker exec -it "$container_name" bash
 }
 
 # Top-level operations

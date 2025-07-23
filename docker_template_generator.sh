@@ -53,6 +53,26 @@ function parse_gpu_flag() {
     echo "$use_gpu"
 }
 
+function parse_cuda_flag() {
+    local use_cuda=false
+    for arg in "$@"; do
+        if [[ "$arg" == "--cuda" ]]; then
+            use_cuda=true
+        fi
+    done
+    echo "$use_cuda"
+}
+
+function parse_cpu_flag() {
+    local use_cpu=false
+    for arg in "$@"; do
+        if [[ "$arg" == "--cpu" ]]; then
+            use_cpu=true
+        fi
+    done
+    echo "$use_cpu"
+}
+
 # Utility to determine CUDA support
 function has_cuda_support() {
     local use_CUDA=false
@@ -81,11 +101,23 @@ function get_application_sim_service() {
     local gpu_flag
     gpu_flag=$(parse_gpu_flag "$@")
     if [[ "$gpu_flag" == "true" ]]; then
-        echo "${PROJECT_NAME}_gpu"
+        echo "application_gpu"
     elif [[ "$(has_cuda_support "$@")" == "true" ]]; then
-        echo "${PROJECT_NAME}_cuda"
+        echo "application_cuda"
     else
-        echo "${PROJECT_NAME}_cpu"
+        echo "application_cpu"
+    fi
+}
+
+function get_application_sim_container_name() {
+    local gpu_flag
+    gpu_flag=$(parse_gpu_flag "$@")
+    if [[ "$gpu_flag" == "true" ]]; then
+        echo "application_sim_gpu"
+    elif [[ "$(has_cuda_support "$@")" == "true" ]]; then
+        echo "application_sim_cuda"
+    else
+        echo "application_sim_cpu"
     fi
 }
 
@@ -115,13 +147,15 @@ function run_container() {
     local base_image="$DOCKER_REGISTRY/$PROJECT_NAME:$base_tag"
     local service
     service=$(get_application_sim_service "$@")
+    local container_name
+    container_name=$(get_application_sim_container_name "$@")
 
     echo "🚀 Starting container: $service"
     xhost +local:docker
     application_sim_BASE_IMAGE="$base_image" \
     application_sim_BASE_IMAGE_TAG="$base_tag" \
     docker compose -f "$COMPOSE_FILE_PATH" up -d "$service"
-    until docker exec -it "$service" bash -c "ls /tmp/build_done" &>/dev/null; do
+    until docker exec -it "$container_name" bash -c "ls /tmp/build_done" &>/dev/null; do
         echo "⏳ Waiting for build to complete..."
         sleep 2
     done
@@ -129,11 +163,11 @@ function run_container() {
 }
 
 function attach_shell() {
-    local service
-    service=$(get_application_sim_service "$@")
+    local container_name
+    container_name=$(get_application_sim_container_name "$@")
 
-    echo "🧑‍💻 Attaching to $service shell..."
-    docker exec -it "$service" bash
+    echo "🧑‍💻 Attaching to $container_name shell..."
+    docker exec -it "$container_name" bash
 }
 
 # Top-level operations
@@ -359,7 +393,7 @@ services:
         BASE_IMAGE: ${CUDA_BASE_IMAGE}
     image: ${DOCKER_REGISTRY}/${PROJECT_NAME}:cuda_base
 
-  application_sim_cuda:
+  application_cuda:
     build:
       context: ${BUILD_CONTEXT}
       dockerfile: ${APPLICATION_SIM_DOCKERFILE}
@@ -391,7 +425,7 @@ services:
               count: ${GPU_COUNT}
               capabilities: [gpu]
 
-  application_sim_gpu:
+  application_gpu:
     build:
       context: ${BUILD_CONTEXT}
       dockerfile: ${APPLICATION_SIM_DOCKERFILE}
@@ -416,7 +450,7 @@ services:
     tty: ${TTY}
     command: []
 
-  application_sim_cpu:
+  application_cpu:
     build:
       context: ${BUILD_CONTEXT}
       dockerfile: ${APPLICATION_SIM_DOCKERFILE}
@@ -442,10 +476,6 @@ EOF_COMPOSE_DOCKER_COMPOSE_YML
     sed -i "s/test_project/$PROJECT_NAME/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"
     sed -i "s/APPLICATION_SIM_DOCKERFILE/${PROJECT_NAME^^}_DOCKERFILE/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"
     sed -i "s/APPLICATION_TEST_PROJECT_DOCKERFILE/${PROJECT_NAME^^}_DOCKERFILE/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"
-    # Replace service names that contain the project name
-    sed -i "s/application_cuda/${PROJECT_NAME}_cuda/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"
-    sed -i "s/application_gpu/${PROJECT_NAME}_gpu/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"  
-    sed -i "s/application_cpu/${PROJECT_NAME}_cpu/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"
     # Replace workspace paths
     sed -i "s/application_ws/${PROJECT_NAME}_ws/g" "${PROJECT_NAME}/docker/compose/docker-compose.yml"
 }
@@ -466,7 +496,7 @@ PROJECT_NAME=application_sim
 
 # Resulting base image names
 BUILT_CPU_BASE_IMAGE=roborregos/application_sim:cpu_base
-BUILT_CUDA_BASE_IMAGE=:roborregos/application_sim:cuda_base
+BUILT_CUDA_BASE_IMAGE=roborregos/application_sim:cuda_base
 CPU_BASE_IMAGE_TAG=cpu_base
 CUDA_BASE_IMAGE_TAG=cuda_base
 
